@@ -166,13 +166,11 @@ export default function ExploreScreen() {
               styles.emptyContainer
             }
           >
-            <Text
-              style={
-                styles.emptyEmoji
-              }
-            >
-              ☕️
-            </Text>
+            <Image
+            source={require("@/assets/images/CupIconApp.png")}
+            style={styles.emptyImage}
+            resizeMode="contain"
+          />
 
             <Text
               style={
@@ -367,8 +365,10 @@ const styles =
       paddingBottom: 120,
     },
 
-    emptyEmoji: {
-      fontSize: 50,
+    emptyImage: {
+      width: 80,
+      height: 80,
+      marginBottom: 16,
     },
 
     emptyTitle: {

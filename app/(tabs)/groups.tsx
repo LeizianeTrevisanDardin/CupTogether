@@ -10,6 +10,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  Image,
   TextInput,
   useWindowDimensions,
   View,
@@ -597,13 +598,11 @@ export default function GroupsScreen() {
               styles.emptyContainer
             }
           >
-            <Text
-              style={
-                styles.emptyEmoji
-              }
-            >
-              ☕️
-            </Text>
+            <Image
+            source={require("@/assets/images/CupIconApp.png")}
+            style={styles.emptyImage}
+            resizeMode="contain"
+          />
 
             <Text
               style={
@@ -961,8 +960,10 @@ const styles =
       paddingVertical: 40,
     },
 
-    emptyEmoji: {
-      fontSize: 45,
+   emptyImage: {
+      width: 80,
+      height: 80,
+      marginBottom: 16,
     },
 
     emptyTitle: {
