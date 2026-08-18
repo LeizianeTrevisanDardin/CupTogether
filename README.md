@@ -498,7 +498,7 @@ npx expo export --platform web
 
 The production web application is deployed through EAS.
 
-### 🌐 Live Demo
+###  Live Demo
 
 **https://cuptogether.expo.app**
 
