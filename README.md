@@ -609,7 +609,7 @@ CupTogether was designed to explore and demonstrate:
 
 ---
 
-# 🔮 Future Improvements
+#  Future Improvements
 
 Planned improvements include:
 
@@ -631,8 +631,8 @@ This project is currently intended for portfolio and educational purposes.
 
 ---
 
-## ☕ CupTogether
+## CupTogether
 
 **Discover coffee. Share your finds. Connect with coffee lovers.**
 
-🌐 **Live Demo:** https://cuptogether.expo.app
+ **Live Demo:** https://cuptogether.expo.app
