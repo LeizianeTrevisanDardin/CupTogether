@@ -31,7 +31,39 @@ The platform allows users to discover and share Coffee Finds, follow other coffe
 
 ##  Screenshots
 
-Screenshots coming soon.
+<p align="center">
+    <img src="assets/images/App Logo.jpeg" width="305" alt="Logo" />
+    <img src="assets/images/initial.jpeg" width="250" alt="Intial Screen" />
+    <img src="assets/images/signup.jpeg" width="250" alt="Sign Up" />
+</p>
+<p align="center">
+    <img src="assets/images/login.jpeg" width="250" alt=Login" />
+    <img src="assets/images/coffee_finds_1.jpeg" width="260" alt=Feed" />
+    <img src="assets/images/add_coffee.jpeg" width="250" alt="Add Coffee" />
+</p>
+<p align="center">
+    <img src="assets/images/coffee_finds_2.jpeg" width="250" alt="Coffee Finds" />
+    <img src="assets/images/groups.jpeg" width="250" alt="Groups" />
+    <img src="assets/images/profile.jpeg" width="250" alt="Profile" />
+</p>
+<p align="center">
+    <img src="assets/images/edit_profile.png" width="250" alt="Edit Profile" />
+    <img src="assets/images/discover.jpeg" width="260" alt="Discover People" />
+    <img src="assets/images/followers.jpeg" width="260" alt="Followers" />
+</p>
+<p align="center">
+    <img src="assets/images/following.jpeg" width="260" alt="Following People" />
+    <img src="assets/images/saved_coffees.jpeg" width="250" alt="Saved Coffees" />
+    <img src="assets/images/explore.jpeg" width="250" alt="Explore" />
+</p>
+    
+    
+
+    
+
+  
+</p>
+
 
 ---
 
