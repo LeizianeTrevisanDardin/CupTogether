@@ -128,7 +128,7 @@ CupTogether/
 
 ---
 
-# 🧭 Navigation
+#  Navigation
 
 CupTogether uses **Expo Router** with file-based routing.
 
@@ -509,7 +509,7 @@ The project architecture also supports future native builds for:
 
 ---
 
-# 💻 Local Development
+# Local Development
 
 Clone the repository:
 
@@ -558,7 +558,7 @@ npx expo start --web
 
 ---
 
-# 🔑 Environment Variables
+#  Environment Variables
 
 The application expects the following environment variables:
 
@@ -589,7 +589,7 @@ User credentials
 
 ---
 
-# 🎯 Project Goals
+#  Project Goals
 
 CupTogether was designed to explore and demonstrate:
 
@@ -613,19 +613,19 @@ CupTogether was designed to explore and demonstrate:
 
 Planned improvements include:
 
-- 📱 Native iOS release
-- 🤖 Native Android release
-- 🔔 Notifications
-- 🗺️ Improved location-based discovery
-- 🔍 Advanced Coffee Find search
-- 📊 User activity insights
-- ☕ Coffee shop discovery improvements
-- 👥 Additional group features
-- ⚡ Performance optimizations
+-  Native iOS release
+-  Native Android release
+-  Notifications
+-  Improved location-based discovery
+-  Advanced Coffee Find search
+-  User activity insights
+-  Coffee shop discovery improvements
+-  Additional group features
+-  Performance optimizations
 
 ---
 
-# 📄 License
+#  License
 
 This project is currently intended for portfolio and educational purposes.
 
