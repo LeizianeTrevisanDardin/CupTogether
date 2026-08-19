@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -32,6 +33,19 @@ import type { Coffee } from "@/types/coffee";
 type CoffeeCardProps = {
   coffee: Coffee;
   initiallySaved?: boolean;
+  currentGroupId?: string;
+
+  onRemovedFromGroup?: (
+    coffeeId: string,
+    groupId: string
+  ) => void;
+};
+
+type ShareGroup = {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  alreadyShared: boolean;
 };
 
 // ==========================================
@@ -118,6 +132,8 @@ const getTimeAgo = (
 export function CoffeeCard({
   coffee,
   initiallySaved = false,
+  currentGroupId,
+  onRemovedFromGroup,
 }: CoffeeCardProps) {
   const { user } = useAuth();
 
@@ -185,6 +201,36 @@ export function CoffeeCard({
     deleteConfirmVisible,
     setDeleteConfirmVisible,
   ] = useState(false);
+
+  const [
+    shareModalVisible,
+    setShareModalVisible,
+  ] = useState(false);
+
+  const [
+    shareGroups,
+    setShareGroups,
+  ] = useState<ShareGroup[]>([]);
+
+  const [
+    loadingShareGroups,
+    setLoadingShareGroups,
+  ] = useState(false);
+
+  const [
+    sharingGroupId,
+    setSharingGroupId,
+  ] = useState<string | null>(null);
+
+  const [
+    removeConfirmVisible,
+    setRemoveConfirmVisible,
+  ] = useState(false);
+
+  const [
+    groupToRemove,
+    setGroupToRemove,
+  ] = useState<ShareGroup | null>(null);
 
   // ==========================================
   // OWN COFFEE
@@ -504,6 +550,459 @@ export function CoffeeCard({
         );
       } finally {
         setLoadingSave(false);
+      }
+    };
+
+  // ==========================================
+  // SHARE TO GROUP
+  // ==========================================
+
+  const loadShareGroups =
+    async () => {
+      if (!user) {
+        return;
+      }
+
+      try {
+        setLoadingShareGroups(true);
+
+        const {
+          data: memberships,
+          error: membershipsError,
+        } = await supabase
+          .from("group_members")
+          .select("group_id")
+          .eq(
+            "user_id",
+            user.id
+          );
+
+        if (membershipsError) {
+          throw membershipsError;
+        }
+
+        const groupIds =
+          (memberships ?? [])
+            .map(
+              (membership) =>
+                membership.group_id
+            )
+            .filter(
+              (groupId): groupId is string =>
+                Boolean(groupId)
+            );
+
+        if (groupIds.length === 0) {
+          setShareGroups([]);
+          return;
+        }
+
+        const {
+          data: groupsData,
+          error: groupsError,
+        } = await supabase
+          .from("groups")
+          .select(
+            "id, name, avatar_url"
+          )
+          .in(
+            "id",
+            groupIds
+          )
+          .order(
+            "name",
+            {
+              ascending: true,
+            }
+          );
+
+        if (groupsError) {
+          throw groupsError;
+        }
+
+        const {
+          data: existingShares,
+          error: sharesError,
+        } = await supabase
+          .from(
+            "coffee_group_shares"
+          )
+          .select("group_id")
+          .eq(
+            "coffee_id",
+            coffee.id
+          )
+          .in(
+            "group_id",
+            groupIds
+          );
+
+        if (sharesError) {
+          throw sharesError;
+        }
+
+        const sharedGroupIds =
+          new Set(
+            (existingShares ?? []).map(
+              (share) =>
+                share.group_id
+            )
+          );
+
+        const formattedGroups: ShareGroup[] =
+          (groupsData ?? []).map(
+            (group) => ({
+              id: group.id,
+              name:
+                group.name ??
+                "Coffee Group",
+              avatarUrl:
+                group.avatar_url ??
+                null,
+              alreadyShared:
+                sharedGroupIds.has(
+                  group.id
+                ),
+            })
+          );
+
+        setShareGroups(
+          formattedGroups
+        );
+      } catch (error: any) {
+        console.log(
+          "Error loading groups for sharing:",
+          error
+        );
+
+        Alert.alert(
+          "Could not load groups",
+          error?.message ??
+            "Please try again."
+        );
+      } finally {
+        setLoadingShareGroups(false);
+      }
+    };
+
+  const handleOpenShareModal =
+    async () => {
+      if (!user) {
+        Alert.alert(
+          "Sign in required",
+          "Please sign in to share a Coffee Find."
+        );
+
+        return;
+      }
+
+      if (!isOwnCoffee) {
+        return;
+      }
+
+      setMenuVisible(false);
+      setShareModalVisible(true);
+
+      await loadShareGroups();
+    };
+
+  const handleShareToGroup =
+    async (groupId: string) => {
+      if (!user) {
+        return;
+      }
+
+      if (sharingGroupId) {
+        return;
+      }
+
+      const selectedGroup =
+        shareGroups.find(
+          (group) =>
+            group.id === groupId
+        );
+
+      if (
+        selectedGroup?.alreadyShared
+      ) {
+        return;
+      }
+
+      try {
+        setSharingGroupId(
+          groupId
+        );
+
+        const { error } =
+          await supabase
+            .from(
+              "coffee_group_shares"
+            )
+            .insert({
+              coffee_id:
+                coffee.id,
+              group_id:
+                groupId,
+              shared_by:
+                user.id,
+            });
+
+        if (
+          error &&
+          error.code !== "23505"
+        ) {
+          throw error;
+        }
+
+        setShareGroups(
+          (current) =>
+            current.map(
+              (group) =>
+                group.id === groupId
+                  ? {
+                      ...group,
+                      alreadyShared: true,
+                    }
+                  : group
+            )
+        );
+      } catch (error: any) {
+        console.log(
+          "Error sharing coffee to group:",
+          error
+        );
+
+        Alert.alert(
+          "Share failed",
+          error?.message ??
+            "Could not share this Coffee Find with the group."
+        );
+      } finally {
+        setSharingGroupId(null);
+      }
+    };
+
+  // ==========================================
+  // REMOVE COFFEE FROM GROUP
+  // ==========================================
+
+  const handleRemoveFromGroup =
+    async (groupId: string) => {
+      if (!user) {
+        return;
+      }
+
+      if (sharingGroupId) {
+        return;
+      }
+
+      try {
+        setSharingGroupId(
+          groupId
+        );
+
+        const { error } =
+          await supabase
+            .from(
+              "coffee_group_shares"
+            )
+            .delete()
+            .eq(
+              "coffee_id",
+              coffee.id
+            )
+            .eq(
+              "group_id",
+              groupId
+            )
+            .eq(
+              "shared_by",
+              user.id
+            );
+
+        if (error) {
+          throw error;
+        }
+
+        onRemovedFromGroup?.(
+          coffee.id,
+          groupId
+        );
+
+        setShareGroups(
+          (current) =>
+            current.map(
+              (group) =>
+                group.id === groupId
+                  ? {
+                      ...group,
+                      alreadyShared: false,
+                    }
+                  : group
+            )
+        );
+      } catch (error: any) {
+        console.log(
+          "Error removing coffee from group:",
+          error
+        );
+
+        Alert.alert(
+          "Remove failed",
+          error?.message ??
+            "Could not remove this Coffee Find from the group."
+        );
+      } finally {
+        setSharingGroupId(null);
+      }
+    };
+
+  const handleGroupPress = (
+    groupId: string
+  ) => {
+    const selectedGroup =
+      shareGroups.find(
+        (group) =>
+          group.id === groupId
+      );
+
+    if (!selectedGroup) {
+      return;
+    }
+
+    if (
+      !selectedGroup.alreadyShared
+    ) {
+      handleShareToGroup(
+        groupId
+      );
+
+      return;
+    }
+
+    setGroupToRemove(
+      selectedGroup
+    );
+
+    setRemoveConfirmVisible(
+      true
+    );
+  };
+
+  const confirmRemoveFromGroup =
+    async () => {
+      if (!groupToRemove) {
+        return;
+      }
+
+      const groupId =
+        groupToRemove.id;
+
+      setRemoveConfirmVisible(
+        false
+      );
+
+      await handleRemoveFromGroup(
+        groupId
+      );
+
+      setGroupToRemove(
+        null
+      );
+    };
+
+  // ==========================================
+  // REMOVE FROM CURRENT GROUP
+  // ==========================================
+
+  const handleOpenCurrentGroupRemove =
+    async () => {
+      if (
+        !user ||
+        !currentGroupId
+      ) {
+        return;
+      }
+
+      setMenuVisible(false);
+
+      try {
+        const {
+          data: shareData,
+          error: shareError,
+        } = await supabase
+          .from(
+            "coffee_group_shares"
+          )
+          .select(
+            "group_id"
+          )
+          .eq(
+            "coffee_id",
+            coffee.id
+          )
+          .eq(
+            "group_id",
+            currentGroupId
+          )
+          .maybeSingle();
+
+        if (shareError) {
+          throw shareError;
+        }
+
+        if (!shareData) {
+          Alert.alert(
+            "Coffee Find belongs to this group",
+            "This Coffee Find was created directly inside this group, so it cannot be removed using the Share option."
+          );
+
+          return;
+        }
+
+        const {
+          data: groupData,
+          error: groupError,
+        } = await supabase
+          .from("groups")
+          .select(
+            "id, name, avatar_url"
+          )
+          .eq(
+            "id",
+            currentGroupId
+          )
+          .maybeSingle();
+
+        if (groupError) {
+          throw groupError;
+        }
+
+        setGroupToRemove({
+          id: currentGroupId,
+          name:
+            groupData?.name ??
+            "this group",
+          avatarUrl:
+            groupData?.avatar_url ??
+            null,
+          alreadyShared: true,
+        });
+
+        setRemoveConfirmVisible(
+          true
+        );
+      } catch (error: any) {
+        console.log(
+          "Error preparing group removal:",
+          error
+        );
+
+        Alert.alert(
+          "Could not remove from group",
+          error?.message ??
+            "Please try again."
+        );
       }
     };
 
@@ -1310,9 +1809,58 @@ export function CoffeeCard({
               Coffee Find
             </Text>
 
+            {currentGroupId ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.menuItem,
+                  pressed &&
+                    styles.menuItemPressed,
+                ]}
+                onPress={
+                  handleOpenCurrentGroupRemove
+                }
+              >
+                <Ionicons
+                  name="remove-circle-outline"
+                  size={21}
+                  color="#B44B4B"
+                />
+
+                <Text
+                  style={styles.removeGroupMenuText}
+                >
+                  Remove from Group
+                </Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.menuItem,
+                  pressed &&
+                    styles.menuItemPressed,
+                ]}
+                onPress={
+                  handleOpenShareModal
+                }
+              >
+                <Ionicons
+                  name="share-social-outline"
+                  size={21}
+                  color="#6F4E37"
+                />
+
+                <Text
+                  style={styles.shareMenuText}
+                >
+                  Share to Group
+                </Text>
+              </Pressable>
+            )}
+
             <Pressable
               style={({ pressed }) => [
                 styles.menuItem,
+                styles.deleteMenuItem,
                 pressed &&
                   styles.menuItemPressed,
               ]}
@@ -1347,6 +1895,328 @@ export function CoffeeCard({
                 Cancel
               </Text>
             </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ======================================
+          SHARE TO GROUP MODAL
+      ====================================== */}
+
+      <Modal
+        visible={shareModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() =>
+          setShareModalVisible(false)
+        }
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() =>
+            setShareModalVisible(false)
+          }
+        >
+          <Pressable
+            style={styles.shareModal}
+            onPress={() => {}}
+          >
+            <View style={styles.shareHeader}>
+              <View
+                style={styles.shareIconCircle}
+              >
+                <Ionicons
+                  name="share-social-outline"
+                  size={24}
+                  color="#6F4E37"
+                />
+              </View>
+
+              <View
+                style={styles.shareHeaderText}
+              >
+                <Text
+                  style={styles.shareTitle}
+                >
+                  Share to Group
+                </Text>
+
+                <Text
+                  style={styles.shareSubtitle}
+                >
+                  Choose where you want to share this Coffee Find.
+                </Text>
+              </View>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.shareCloseButton,
+                  pressed &&
+                    styles.menuItemPressed,
+                ]}
+                onPress={() =>
+                  setShareModalVisible(false)
+                }
+              >
+                <Ionicons
+                  name="close"
+                  size={22}
+                  color="#76594F"
+                />
+              </Pressable>
+            </View>
+
+            {loadingShareGroups ? (
+              <View style={styles.shareEmpty}>
+                <Image
+                  source={require(
+                    "@/assets/images/CupIconApp.png"
+                  )}
+                  style={styles.shareLoadingLogo}
+                  resizeMode="contain"
+                />
+
+                <Text
+                  style={styles.shareEmptyText}
+                >
+                  Loading your groups...
+                </Text>
+              </View>
+            ) : shareGroups.length === 0 ? (
+              <View style={styles.shareEmpty}>
+                <View
+                  style={styles.shareEmptyIcon}
+                >
+                  <Ionicons
+                    name="people-outline"
+                    size={30}
+                    color="#8A6F63"
+                  />
+                </View>
+
+                <Text
+                  style={styles.shareEmptyTitle}
+                >
+                  No groups yet
+                </Text>
+
+                <Text
+                  style={styles.shareEmptyText}
+                >
+                  Create or join a group before sharing Coffee Finds.
+                </Text>
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.goToGroupsButton,
+                    pressed &&
+                      styles.menuItemPressed,
+                  ]}
+                  onPress={() => {
+                    setShareModalVisible(false);
+                    router.push(
+                      "/(tabs)/groups"
+                    );
+                  }}
+                >
+                  <Text
+                    style={styles.goToGroupsButtonText}
+                  >
+                    Go to Groups
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <ScrollView
+                style={styles.shareGroupList}
+                contentContainerStyle={
+                  styles.shareGroupListContent
+                }
+                showsVerticalScrollIndicator={false}
+              >
+                {shareGroups.map((group) => {
+                  const sharing =
+                    sharingGroupId === group.id;
+
+                  return (
+                    <Pressable
+                      key={group.id}
+                      style={({ pressed }) => [
+                        styles.shareGroupItem,
+                        group.alreadyShared &&
+                          styles.shareGroupItemShared,
+                        pressed &&
+                          styles.menuItemPressed,
+                      ]}
+                      onPress={() =>
+                        handleGroupPress(
+                          group.id
+                        )
+                      }
+                      disabled={
+                        Boolean(sharingGroupId)
+                      }
+                    >
+                      {group.avatarUrl ? (
+                        <Image
+                          source={{
+                            uri: group.avatarUrl,
+                          }}
+                          style={styles.shareGroupAvatar}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View
+                          style={
+                            styles.shareGroupAvatarFallback
+                          }
+                        >
+                          <Ionicons
+                            name="people"
+                            size={22}
+                            color="#6F4E37"
+                          />
+                        </View>
+                      )}
+
+                      <View
+                        style={styles.shareGroupInfo}
+                      >
+                        <Text
+                          style={styles.shareGroupName}
+                          numberOfLines={1}
+                        >
+                          {group.name}
+                        </Text>
+
+                        <Text
+                          style={styles.shareGroupStatus}
+                        >
+                          {sharing
+                            ? group.alreadyShared
+                              ? "Removing..."
+                              : "Sharing..."
+                            : group.alreadyShared
+                            ? "Shared • Tap to remove"
+                            : "Share Coffee Find"}
+                        </Text>
+                      </View>
+
+                      {sharing ? (
+                        <Text
+                          style={styles.sharingText}
+                        >
+                          ...
+                        </Text>
+                      ) : group.alreadyShared ? (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={25}
+                          color="#6F4E37"
+                        />
+                      ) : (
+                        <Ionicons
+                          name="chevron-forward"
+                          size={21}
+                          color="#A48B7F"
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ======================================
+          REMOVE FROM GROUP CONFIRMATION
+      ====================================== */}
+
+      <Modal
+        visible={removeConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setRemoveConfirmVisible(false);
+          setGroupToRemove(null);
+        }}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => {
+            setRemoveConfirmVisible(false);
+            setGroupToRemove(null);
+          }}
+        >
+          <Pressable
+            style={styles.removeConfirmModal}
+            onPress={() => {}}
+          >
+            <View style={styles.removeConfirmIconCircle}>
+              <Ionicons
+                name="remove-circle-outline"
+                size={30}
+                color="#B44B4B"
+              />
+            </View>
+
+            <Text style={styles.removeConfirmTitle}>
+              Remove from group?
+            </Text>
+
+            <Text style={styles.removeConfirmText}>
+              Remove this Coffee Find from{" "}
+              <Text style={styles.removeConfirmGroupName}>
+                {groupToRemove?.name ?? "this group"}
+              </Text>
+              ?
+            </Text>
+
+            <Text style={styles.removeConfirmHint}>
+              The Coffee Find will stay in your Feed. It will only be
+              removed from this group.
+            </Text>
+
+            <View style={styles.removeConfirmActions}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.removeCancelButton,
+                  pressed && styles.menuItemPressed,
+                ]}
+                onPress={() => {
+                  setRemoveConfirmVisible(false);
+                  setGroupToRemove(null);
+                }}
+                disabled={Boolean(sharingGroupId)}
+              >
+                <Text style={styles.removeCancelText}>
+                  Cancel
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.removeButton,
+                  pressed && styles.removeButtonPressed,
+                  Boolean(sharingGroupId) &&
+                    styles.removeButtonDisabled,
+                ]}
+                onPress={confirmRemoveFromGroup}
+                disabled={Boolean(sharingGroupId)}
+              >
+                <Ionicons
+                  name="remove-circle-outline"
+                  size={18}
+                  color="#FFFFFF"
+                />
+
+                <Text style={styles.removeButtonText}>
+                  Remove
+                </Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -2025,6 +2895,205 @@ const styles =
       opacity: 0.72,
     },
 
+    shareMenuText: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: "#6F4E37",
+    },
+
+    removeGroupMenuText: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: "#B44B4B",
+    },
+
+    deleteMenuItem: {
+      marginTop: 8,
+    },
+
+    // ======================================
+    // SHARE MODAL
+    // ======================================
+
+    shareModal: {
+      width: "100%",
+      maxWidth: 460,
+      maxHeight: "75%",
+      backgroundColor: "#FFF9F5",
+      borderRadius: 26,
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 18,
+      shadowColor: "#3B241C",
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      shadowOpacity: 0.16,
+      shadowRadius: 18,
+      elevation: 8,
+    },
+
+    shareHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 18,
+    },
+
+    shareIconCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: "#F3E9E3",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+
+    shareHeaderText: {
+      flex: 1,
+      marginLeft: 12,
+      marginRight: 8,
+    },
+
+    shareTitle: {
+      fontSize: 19,
+      fontWeight: "800",
+      color: "#3B241C",
+    },
+
+    shareSubtitle: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: "#8A6F63",
+      marginTop: 3,
+    },
+
+    shareCloseButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: "#F7EFEA",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+
+    shareGroupList: {
+      maxHeight: 390,
+    },
+
+    shareGroupListContent: {
+      gap: 9,
+      paddingBottom: 4,
+    },
+
+    shareGroupItem: {
+      width: "100%",
+      minHeight: 68,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#FFFFFF",
+      borderWidth: 1,
+      borderColor: "#EFE3DC",
+      borderRadius: 18,
+      paddingHorizontal: 13,
+      paddingVertical: 10,
+    },
+
+    shareGroupItemShared: {
+      backgroundColor: "#F7EFEA",
+    },
+
+    shareGroupAvatar: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      backgroundColor: "#F3E9E3",
+    },
+
+    shareGroupAvatarFallback: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      backgroundColor: "#F1E4DC",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+
+    shareGroupInfo: {
+      flex: 1,
+      marginLeft: 12,
+      marginRight: 8,
+    },
+
+    shareGroupName: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: "#3B241C",
+    },
+
+    shareGroupStatus: {
+      fontSize: 12,
+      color: "#9A8175",
+      marginTop: 3,
+    },
+
+    sharingText: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: "#6F4E37",
+    },
+
+    shareEmpty: {
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 28,
+    },
+
+    shareEmptyIcon: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: "#F3E9E3",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+
+    shareLoadingLogo: {
+      width: 55,
+      height: 55,
+      marginBottom: 8,
+    },
+
+    shareEmptyTitle: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: "#3B241C",
+      marginTop: 13,
+    },
+
+    shareEmptyText: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: "#8A6F63",
+      textAlign: "center",
+      marginTop: 6,
+      maxWidth: 280,
+    },
+
+    goToGroupsButton: {
+      backgroundColor: "#6F4E37",
+      borderRadius: 22,
+      paddingHorizontal: 22,
+      paddingVertical: 11,
+      marginTop: 18,
+    },
+
+    goToGroupsButtonText: {
+      color: "#FFFFFF",
+      fontSize: 14,
+      fontWeight: "700",
+    },
+
     deleteMenuText: {
       fontSize: 15,
       fontWeight: "700",
@@ -2048,6 +3117,148 @@ const styles =
       fontSize: 15,
       fontWeight: "700",
       color: "#6F4E37",
+    },
+
+    // ======================================
+    // REMOVE FROM GROUP CONFIRMATION
+    // ======================================
+
+    removeConfirmModal: {
+      width: "100%",
+      maxWidth: 430,
+
+      backgroundColor: "#FFF9F5",
+
+      borderRadius: 26,
+
+      paddingHorizontal: 24,
+      paddingVertical: 26,
+
+      alignItems: "center",
+
+      shadowColor: "#3B241C",
+
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+
+      shadowOpacity: 0.16,
+      shadowRadius: 18,
+
+      elevation: 8,
+    },
+
+    removeConfirmIconCircle: {
+      width: 62,
+      height: 62,
+
+      borderRadius: 31,
+
+      backgroundColor: "#F8E7E4",
+
+      justifyContent: "center",
+      alignItems: "center",
+    },
+
+    removeConfirmTitle: {
+      fontSize: 21,
+      fontWeight: "800",
+      color: "#3B241C",
+
+      marginTop: 16,
+
+      textAlign: "center",
+    },
+
+    removeConfirmText: {
+      fontSize: 15,
+      lineHeight: 22,
+      color: "#76594F",
+
+      textAlign: "center",
+
+      marginTop: 9,
+    },
+
+    removeConfirmGroupName: {
+      color: "#3B241C",
+      fontWeight: "700",
+    },
+
+    removeConfirmHint: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: "#A48B7F",
+
+      textAlign: "center",
+
+      marginTop: 8,
+
+      maxWidth: 340,
+    },
+
+    removeConfirmActions: {
+      width: "100%",
+
+      flexDirection: "row",
+
+      gap: 10,
+
+      marginTop: 24,
+    },
+
+    removeCancelButton: {
+      flex: 1,
+
+      minHeight: 50,
+
+      borderRadius: 25,
+
+      borderWidth: 1,
+      borderColor: "#DCCBC1",
+
+      justifyContent: "center",
+      alignItems: "center",
+
+      backgroundColor: "#FFFFFF",
+    },
+
+    removeCancelText: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: "#6F4E37",
+    },
+
+    removeButton: {
+      flex: 1,
+
+      minHeight: 50,
+
+      borderRadius: 25,
+
+      flexDirection: "row",
+      gap: 7,
+
+      justifyContent: "center",
+      alignItems: "center",
+
+      backgroundColor: "#B44B4B",
+    },
+
+    removeButtonPressed: {
+      opacity: 0.84,
+    },
+
+    removeButtonDisabled: {
+      opacity: 0.55,
+    },
+
+    removeButtonText: {
+      color: "#FFFFFF",
+
+      fontSize: 15,
+      fontWeight: "700",
     },
 
     confirmModal: {
