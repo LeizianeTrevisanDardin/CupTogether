@@ -118,6 +118,12 @@ export default function GroupDetailsScreen() {
   ] =
     useState(false);
 
+  const [
+    sharedCoffeeIds,
+    setSharedCoffeeIds,
+  ] =
+    useState<string[]>([]);
+
   // ==========================================
   // GROUP COFFEES
   // ==========================================
@@ -128,14 +134,23 @@ export default function GroupDetailsScreen() {
         return [];
       }
 
+      const sharedIds =
+        new Set(
+          sharedCoffeeIds
+        );
+
       return coffees.filter(
         (coffee) =>
           coffee.groupId ===
-          group.id
+            group.id ||
+          sharedIds.has(
+            coffee.id
+          )
       );
     }, [
       coffees,
       group,
+      sharedCoffeeIds,
     ]);
 
   // ==========================================
@@ -182,6 +197,51 @@ export default function GroupDetailsScreen() {
 
           setGroup(
             groupData
+          );
+
+          // ----------------------------------
+          // LOAD SHARED COFFEE FINDS
+          // ----------------------------------
+
+          const {
+            data: shareRows,
+            error: sharesError,
+          } =
+            await supabase
+              .from(
+                "coffee_group_shares"
+              )
+              .select(
+                "coffee_id"
+              )
+              .eq(
+                "group_id",
+                id
+              );
+
+          if (sharesError) {
+            throw sharesError;
+          }
+
+          const sharedIds =
+            (
+              shareRows ?? []
+            )
+              .map(
+                (share) =>
+                  share.coffee_id
+              )
+              .filter(
+                (
+                  coffeeId
+                ): coffeeId is string =>
+                  Boolean(
+                    coffeeId
+                  )
+              );
+
+          setSharedCoffeeIds(
+            sharedIds
           );
 
           // ----------------------------------
@@ -692,6 +752,25 @@ export default function GroupDetailsScreen() {
     user?.id ===
     group?.created_by;
 
+  const handleCoffeeRemovedFromGroup = (
+  coffeeId: string,
+  groupId: string
+) => {
+  if (
+    groupId !== group?.id
+  ) {
+    return;
+  }
+
+  setSharedCoffeeIds(
+    (current) =>
+      current.filter(
+        (id) =>
+          id !== coffeeId
+      )
+  );
+};
+
   // ==========================================
   // SCREEN
   // ==========================================
@@ -1091,11 +1170,16 @@ export default function GroupDetailsScreen() {
                         styles.coffeeCardWrapper
                       }
                     >
-                      <CoffeeCard
-                        coffee={
-                          coffee
+                     <CoffeeCard
+                        coffee={coffee}
+                        currentGroupId={
+                          group?.id ?? undefined
+                        }
+                        onRemovedFromGroup={
+                          handleCoffeeRemovedFromGroup
                         }
                       />
+                      
                     </View>
                   )
                 )}

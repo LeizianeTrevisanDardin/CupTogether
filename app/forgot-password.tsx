@@ -204,7 +204,7 @@ export default function ForgotPasswordScreen() {
             }}
           >
             <Text style={styles.resendText}>
-              Didn't receive an email?{" "}
+              Did not receive an email?{" "}
               <Text style={styles.linkStrong}>
                 Try again
               </Text>
@@ -278,7 +278,7 @@ export default function ForgotPasswordScreen() {
           ]}
         >
           No worries. Enter the email associated
-          with your CupTogether account and we'll
+          with your CupTogether account and we will
           send you a password reset link.
         </Text>
 
