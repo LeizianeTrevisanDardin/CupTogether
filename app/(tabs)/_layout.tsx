@@ -1,8 +1,8 @@
 import { Tabs } from "expo-router";
 import React from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { HapticTab } from "@/components/haptic-tab";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 
 export default function TabLayout() {
   return (
@@ -28,56 +28,96 @@ export default function TabLayout() {
         },
       }}
     >
+      {/* FEED */}
       <Tabs.Screen
         name="index"
         options={{
           title: "Feed",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol
+
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
               size={26}
-              name="house.fill"
               color={color}
             />
           ),
         }}
       />
 
+      {/* ADD COFFEE */}
       <Tabs.Screen
         name="add-coffee"
         options={{
           title: "Add Coffee",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol
-              size={26}
-              name="plus.circle.fill"
+
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={
+                focused
+                  ? "add-circle"
+                  : "add-circle-outline"
+              }
+              size={28}
               color={color}
             />
           ),
         }}
       />
 
+      {/* GROUPS */}
       <Tabs.Screen
         name="groups"
         options={{
           title: "Groups",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol
-              size={26}
-              name="person.2.fill"
+
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={
+                focused
+                  ? "people"
+                  : "people-outline"
+              }
+              size={27}
               color={color}
             />
           ),
         }}
       />
 
+      {/* PROFILE */}
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => (
-            <IconSymbol
-              size={26}
-              name="person.crop.circle.fill"
+
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={
+                focused
+                  ? "person-circle"
+                  : "person-circle-outline"
+              }
+              size={29}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      {/* EXPLORE */}
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: "Explore",
+
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={
+                focused
+                  ? "compass"
+                  : "compass-outline"
+              }
+              size={27}
               color={color}
             />
           ),
